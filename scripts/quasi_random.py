@@ -9,6 +9,7 @@ from modules.shared import opts, cmd_opts, state
 from modules.rng import ImageRNG
 
 import torch
+import numpy as np
 from nevergrad.common import sphere
 
 class QuasiRandomRNG(ImageRNG):
@@ -18,7 +19,10 @@ class QuasiRandomRNG(ImageRNG):
 
         def next(self):
                 xs = super().next()
-                xs =  torch.FloatTensor(sphere.quasi_randomize(xs.cpu().numpy(), self.method)).to(device=devices.device)
+                xs = np.moveaxis(xs.cpu().numpy(), 1, 3)
+                xs = sphere.quasi_randomize(xs, self.method)
+                xs = np.moveaxis(xs, 3, 1)
+                xs =  torch.FloatTensor(xs).to(device=devices.device)
                 return xs
 
         @classmethod
@@ -65,8 +69,9 @@ class Script(scripts.Script):
                         rng = ImageRNG(p.rng.shape, p.all_seeds, subseeds=p.all_subseeds, subseed_strength=p.subseed_strength, seed_resize_from_h=p.seed_resize_from_h, seed_resize_from_w=p.seed_resize_from_w)
                         self.FULL_BATCH_LATENT = rng.next()
                         self.FULL_BATCH_LATENT = self.FULL_BATCH_LATENT.cpu().numpy()
+                        self.FULL_BATCH_LATENT = np.moveaxis(self.FULL_BATCH_LATENT, 1, 3)
                         self.FULL_BATCH_LATENT = sphere.quasi_randomize(self.FULL_BATCH_LATENT, args[1])
-
+                        self.FULL_BATCH_LATENT = np.moveaxis(self.FULL_BATCH_LATENT, 3, 1)
                 if args[2]:
                         p.rng = DummyImageRNG(self.FULL_BATCH_LATENT, p.batch_size, batch_number=kwargs['batch_number'])
                 else:
@@ -76,7 +81,7 @@ class Script(scripts.Script):
         # Setup menu ui detail
         def ui(self, is_img2img):
                 choices = ["none"]
-                with gr.Accordion('Quasi-random init', open=False):
+                with gr.Accordion('Quasi-random init', open=True):
                         with gr.Row():
                                 use_quasi_random = gr.Checkbox(
                                         True,
